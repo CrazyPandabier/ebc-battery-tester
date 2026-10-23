@@ -57,11 +57,10 @@ pub(crate) fn request_device(event_tx: UnboundedSender<DeviceEvent>) {
             return;
         };
         let usb = window.navigator().usb();
-        let ch340_filter = web_sys::UsbDeviceFilter::new();
-        ch340_filter.set_vendor_id(crate::device::CH340_VENDOR_ID);
-        let cp210x_filter = web_sys::UsbDeviceFilter::new();
-        cp210x_filter.set_vendor_id(crate::device::CP210X_VENDOR_ID);
-        let options = web_sys::UsbDeviceRequestOptions::new(&[ch340_filter, cp210x_filter]);
+        let filter = web_sys::UsbDeviceFilter::new();
+        filter.set_vendor_id(crate::device::CH340_VENDOR_ID);
+
+        let options = web_sys::UsbDeviceRequestOptions::new(&[filter]);
         match JsFuture::from(usb.request_device(&options)).await {
             Ok(_) => enumerate_devices(event_tx),
             Err(e) => {

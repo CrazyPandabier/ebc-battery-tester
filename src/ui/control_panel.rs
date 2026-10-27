@@ -1,3 +1,7 @@
+use egui_plot::PlotPoint;
+use std::fs::File;
+use std::io::Write;
+
 use crate::device;
 use crate::device::OutboundFrame;
 use crate::session::DeviceSession;
@@ -73,6 +77,22 @@ impl ControlPanel {
             }
             device::DeviceMode::ChargeConstantVoltage => {
                 self.charge_constant_voltage_buttons(session, ui);
+            }
+        }
+
+        match Self::export_plot_data_button(session, ui) {
+            Ok(_) => {}
+            Err(e) => {
+                //pop up an error dialog here
+                egui::Window::new("Error")
+                    .collapsible(false)
+                    .resizable(false)
+                    .show(ui.ctx(), |ui| {
+                        ui.label(format!("Failed to export plot data: {e}"));
+                        if ui.button("OK").clicked() {
+                            ui.close();
+                        }
+                    });
             }
         }
     }
@@ -358,5 +378,67 @@ impl ControlPanel {
                 session.continue_mode();
             }
         });
+    }
+
+    fn export_plot_data_button(
+        session: &DeviceSession,
+        ui: &mut egui::Ui,
+    ) -> Result<(), std::io::Error> {
+        if !session.mode_on
+            && !session.voltage_points.is_empty()
+            && !session.amperes_points.is_empty()
+            && ui.button("Export Plot Data").clicked()
+            && let Some(path) = rfd::FileDialog::new()
+                .set_title("Save Plot Data as CSV")
+                .add_filter("CSV files", &["csv"])
+                .save_file()
+        {
+            match Self::export_to_csv(
+                &session.voltage_points,
+                &session.amperes_points,
+                if let Some(path) = path.to_str() {
+                    path
+                } else {
+                    log::error!("Invalid file path: {}", path.display());
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "Invalid file path",
+                    ));
+                },
+            ) {
+                Ok(_) => {
+                    log::info!("Plot data exported to {}", path.display());
+                }
+                Err(e) => {
+                    log::error!("Failed to export plot data: {e}");
+                    //pop up an error dialog here
+                    return Err(e);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn export_to_csv(
+        voltage_points: &[PlotPoint],
+        amperes_points: &[PlotPoint],
+        path: &str,
+    ) -> std::io::Result<()> {
+        //if file name extension is not .csv, add it
+        let path = if !path.ends_with(".csv") {
+            format!("{path}.csv")
+        } else {
+            path.to_owned()
+        };
+
+        let mut file = File::create(path)?;
+
+        writeln!(file, "Time (s),Voltage (V),Current (A)")?;
+
+        for (v, a) in voltage_points.iter().zip(amperes_points.iter()) {
+            writeln!(file, "{}, {}, {}", v.x, v.y, a.y)?;
+        }
+
+        Ok(())
     }
 }

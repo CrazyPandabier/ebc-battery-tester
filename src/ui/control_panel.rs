@@ -1,6 +1,5 @@
-use egui_plot::PlotPoint;
-use std::fs::File;
-use std::io::Write;
+#[cfg(not(target_arch = "wasm32"))]
+use {egui_plot::PlotPoint, std::fs::File, std::io::Write as _};
 
 use crate::device;
 use crate::device::OutboundFrame;
@@ -80,6 +79,7 @@ impl ControlPanel {
             }
         }
 
+        #[cfg(not(target_arch = "wasm32"))]
         match Self::export_plot_data_button(session, ui) {
             Ok(_) => {}
             Err(e) => {
@@ -380,6 +380,7 @@ impl ControlPanel {
         });
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn export_plot_data_button(
         session: &DeviceSession,
         ui: &mut egui::Ui,
@@ -419,6 +420,7 @@ impl ControlPanel {
         Ok(())
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn export_to_csv(
         voltage_points: &[PlotPoint],
         amperes_points: &[PlotPoint],

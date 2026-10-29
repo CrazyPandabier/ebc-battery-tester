@@ -1,5 +1,6 @@
 use crate::device;
 use crate::device::OutboundFrame;
+
 use axum::extract::State;
 use axum::{Json, Router, http::StatusCode, response::IntoResponse, routing::post};
 use serde::Deserialize;
@@ -49,21 +50,13 @@ impl APIServer {
             // --- Constant Current (CC) Control ---
             .route("/discharge/constant-current/start", post(Self::start_cc))
             .route("/discharge/constant-current/stop", post(Self::stop_cc))
-            .route(
-                "/discharge/constant-current/continue",
-                post(Self::continue_cc),
-            )
+            .route("/discharge/constant-current/adjust", post(Self::adjust_cc))
             // --- Constant Power (CP) Control ---
             .route("/discharge/constant-power/start", post(Self::start_cp))
             .route("/discharge/constant-power/stop", post(Self::stop_cp))
-            .route(
-                "/discharge/constant-power/continue",
-                post(Self::continue_cp),
-            )
             // --- Constant Voltage (CV) Charge Control ---
             .route("/charge/constant-voltage/start", post(Self::start_cv))
             .route("/charge/constant-voltage/stop", post(Self::stop_cv))
-            .route("/charge/constant-voltage/continue", post(Self::continue_cv))
             .with_state(tx); // Pass the channel sender as state instead of SharedSession
 
         let listener = tokio::net::TcpListener::bind("127.0.0.1:8080").await?;
@@ -100,11 +93,11 @@ impl APIServer {
         StatusCode::OK
     }
 
-    async fn continue_cc(
+    async fn adjust_cc(
         State(tx): State<ApiSender>,
         Json(payload): Json<ConstantCurrentRequest>,
     ) -> impl IntoResponse {
-        let frame = OutboundFrame::ContinueConstantCurrentDischarge(
+        let frame = OutboundFrame::AdjustConstantCurrentDischarge(
             (payload.discharge_current * 1000.0) as u16,
             (payload.discharge_cutoff_voltage * 1000.0) as u16,
             if payload.discharge_time_enabled {
@@ -139,23 +132,6 @@ impl APIServer {
         StatusCode::OK
     }
 
-    async fn continue_cp(
-        State(tx): State<ApiSender>,
-        Json(payload): Json<ConstantPowerRequest>,
-    ) -> impl IntoResponse {
-        let frame = OutboundFrame::ContinueConstantPowerDischarge(
-            payload.discharge_watts,
-            (payload.discharge_cutoff_voltage * 1000.0) as u16,
-            if payload.discharge_time_enabled {
-                payload.discharge_time
-            } else {
-                device::MIN_CUTOFF_TIME_MIN
-            },
-        );
-        drop(tx.send(ApiCommand::Continue(frame)).await);
-        StatusCode::OK
-    }
-
     async fn start_cv(
         State(tx): State<ApiSender>,
         Json(payload): Json<ConstantVoltageRequest>,
@@ -171,19 +147,6 @@ impl APIServer {
 
     async fn stop_cv(State(tx): State<ApiSender>) -> impl IntoResponse {
         drop(tx.send(ApiCommand::Stop).await);
-        StatusCode::OK
-    }
-
-    async fn continue_cv(
-        State(tx): State<ApiSender>,
-        Json(payload): Json<ConstantVoltageRequest>,
-    ) -> impl IntoResponse {
-        let frame = OutboundFrame::ContinueConstantVoltageCharge(
-            (payload.charge_current * 1000.0) as u16,
-            (payload.charge_voltage * 1000.0) as u16,
-            (payload.charge_cutoff_current * 1000.0) as u16,
-        );
-        drop(tx.send(ApiCommand::Continue(frame)).await);
         StatusCode::OK
     }
 }

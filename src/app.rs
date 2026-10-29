@@ -1,11 +1,13 @@
 #[cfg(not(target_arch = "wasm32"))]
-use tokio::sync::mpsc::Receiver;
-
 use crate::api::APIServer;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::api::ApiCommand;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::device::OutboundFrame;
+#[cfg(not(target_arch = "wasm32"))]
+use tokio::sync::mpsc::Receiver;
 
-use crate::device::{ConnectionStatus, OutboundFrame};
+use crate::device::ConnectionStatus;
 use crate::session::DeviceSession;
 use crate::ui;
 
@@ -37,29 +39,32 @@ impl MainApp {
         app.session = DeviceSession::new(&cc.egui_ctx);
         app.about_window = ui::about_window::AboutWindow::new(&cc.egui_ctx);
 
-        let (tx, rx) = tokio::sync::mpsc::channel(32);
-        app.api_rx = Some(rx);
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let (tx, rx) = tokio::sync::mpsc::channel(32);
+            app.api_rx = Some(rx);
 
-        std::thread::spawn(move || {
-            let rt = match tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-            {
-                Ok(rt) => rt,
-                Err(e) => {
-                    log::error!("Failed to create tokio runtime: {e}");
-                    return;
-                }
-            };
-
-            rt.block_on(async {
-                if let Ok(server) = APIServer::new(tx).await
-                    && let Err(e) = server.run().await
+            std::thread::spawn(move || {
+                let rt = match tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
                 {
-                    log::error!("API server stopped with an error: {e}");
-                }
+                    Ok(rt) => rt,
+                    Err(e) => {
+                        log::error!("Failed to create tokio runtime: {e}");
+                        return;
+                    }
+                };
+
+                rt.block_on(async {
+                    if let Ok(server) = APIServer::new(tx).await
+                        && let Err(e) = server.run().await
+                    {
+                        log::error!("API server stopped with an error: {e}");
+                    }
+                });
             });
-        });
+        }
 
         app
     }
@@ -79,6 +84,7 @@ impl eframe::App for MainApp {
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        #[cfg(not(target_arch = "wasm32"))]
         if let Some(rx) = &mut self.api_rx {
             while let Ok(cmd) = rx.try_recv() {
                 match cmd {

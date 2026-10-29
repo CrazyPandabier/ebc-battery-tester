@@ -1,0 +1,95 @@
+### Variables
+@host = http://127.0.0.1:8080
+
+### ==========================================
+### 1. Constant Current (CC) Tests
+### ==========================================
+
+### Start Constant Current Discharge
+POST {{host}}/discharge/constant-current/start
+Content-Type: application/json
+
+{
+  "discharge_current": 1.0,
+  "discharge_cutoff_voltage": 2.5,
+  "discharge_time_enabled": true,
+  "discharge_time": 1
+}
+
+### ---
+### Continue Constant Current Discharge
+POST {{host}}/discharge/constant-current/continue
+Content-Type: application/json
+
+{
+  "discharge_current": 1.0,
+  "discharge_cutoff_voltage": 2.5,
+  "discharge_time_enabled": false,
+  "discharge_time": 0
+}
+
+### ---
+### Stop Constant Current
+POST {{host}}/discharge/constant-current/stop
+
+
+### ==========================================
+### 2. Constant Power (CP) Tests
+### ==========================================
+
+### Start Constant Power Discharge
+POST {{host}}/discharge/constant-power/start
+Content-Type: application/json
+
+{
+  "discharge_watts": 1.0,
+  "discharge_cutoff_voltage": 2.5,
+  "discharge_time_enabled": true,
+  "discharge_time": 30
+}
+
+### ---
+### Continue Constant Power Discharge
+POST {{host}}/discharge/constant-power/continue
+Content-Type: application/json
+
+{
+  "discharge_watts": 1.0,
+  "discharge_cutoff_voltage": 2.5,
+  "discharge_time_enabled": false,
+  "discharge_time": 0
+}
+
+### ---
+### Stop Constant Power
+POST {{host}}/discharge/constant-power/stop
+
+
+### ==========================================
+### 3. Constant Voltage (CV) Charge Tests
+### ==========================================
+
+### Start Constant Voltage Charge
+POST {{host}}/charge/constant-voltage/start
+Content-Type: application/json
+
+{
+  "charge_current": 0.67,
+  "charge_voltage": 3.65,
+  "charge_cutoff_current": 0.01
+}
+
+### ---
+### Continue Constant Voltage Charge
+POST {{host}}/charge/constant-voltage/continue
+Content-Type: application/json
+
+{
+  "charge_current": 0.67,
+  "charge_voltage": 3.65,
+  "charge_cutoff_current": 0.01
+}
+
+### ---
+### Stop Constant Voltage Charge
+POST {{host}}/charge/constant-voltage/stop

@@ -9,6 +9,7 @@ mod usb;
 #[cfg(not(target_arch = "wasm32"))]
 mod update_check;
 
+mod api;
 mod app;
 mod device;
 mod export;

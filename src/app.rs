@@ -1,4 +1,11 @@
-use crate::device::ConnectionStatus;
+#[cfg(not(target_arch = "wasm32"))]
+use tokio::sync::mpsc::Receiver;
+
+use crate::api::APIServer;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::api::ApiCommand;
+
+use crate::device::{ConnectionStatus, OutboundFrame};
 use crate::session::DeviceSession;
 use crate::ui;
 
@@ -14,6 +21,10 @@ pub struct MainApp {
     log_window: ui::log_window::LogWindow,
     #[serde(skip)]
     about_window: ui::about_window::AboutWindow,
+
+    #[serde(skip)]
+    #[cfg(not(target_arch = "wasm32"))]
+    api_rx: Option<Receiver<ApiCommand>>,
 }
 
 impl MainApp {
@@ -25,6 +36,31 @@ impl MainApp {
         };
         app.session = DeviceSession::new(&cc.egui_ctx);
         app.about_window = ui::about_window::AboutWindow::new(&cc.egui_ctx);
+
+        let (tx, rx) = tokio::sync::mpsc::channel(32);
+        app.api_rx = Some(rx);
+
+        std::thread::spawn(move || {
+            let rt = match tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+            {
+                Ok(rt) => rt,
+                Err(e) => {
+                    log::error!("Failed to create tokio runtime: {e}");
+                    return;
+                }
+            };
+
+            rt.block_on(async {
+                if let Ok(server) = APIServer::new(tx).await
+                    && let Err(e) = server.run().await
+                {
+                    log::error!("API server stopped with an error: {e}");
+                }
+            });
+        });
+
         app
     }
 }
@@ -43,6 +79,25 @@ impl eframe::App for MainApp {
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        if let Some(rx) = &mut self.api_rx {
+            while let Ok(cmd) = rx.try_recv() {
+                match cmd {
+                    ApiCommand::Start(frame) => {
+                        self.session.send_cmd(frame, ui.ctx());
+                        self.session.start_mode();
+                    }
+                    ApiCommand::Continue(frame) => {
+                        self.session.send_cmd(frame, ui.ctx());
+                        self.session.continue_mode();
+                    }
+                    ApiCommand::Stop => {
+                        self.session.send_cmd(OutboundFrame::Stop, ui.ctx());
+                        self.session.stop_mode();
+                    }
+                }
+            }
+        }
+
         self.about_window.poll();
         self.session.consume_events();
         // Request a repaint every second to update the timer. This is needed so
